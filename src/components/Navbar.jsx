@@ -3,7 +3,8 @@ import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { 
   LogOut, User, ShieldCheck, 
-  Menu, X, Trophy, AlertTriangle 
+  Menu, X, Trophy, AlertTriangle,
+  CreditCard // เพิ่ม Icon สำหรับเมนูชำระเงิน
 } from "lucide-react"; 
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -36,7 +37,7 @@ export default function Navbar() {
     />
   );
 
-  return (
+return (
     <>
       <nav className="sticky top-0 z-[45] border-b border-white/5 bg-slate-900 backdrop-blur-xl font-['Prompt']">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5">
@@ -62,12 +63,22 @@ export default function Navbar() {
                   <>ประวัติของฉัน {isActive && <ActiveLine />}</>
                 )}
               </NavLink>
+              
+              {/* ส่วนที่เพิ่ม: เมนู Admin หลัก */}
               {user?.role === 'Admin' && (
-                <NavLink to="/admin/users" className={navLinkCls}>
-                  {({ isActive }) => (
-                    <>จัดการผู้ใช้งาน {isActive && <ActiveLine />}</>
-                  )}
-                </NavLink>
+                <>
+                  <NavLink to="/admin/users" className={navLinkCls}>
+                    {({ isActive }) => (
+                      <>จัดการผู้ใช้งาน {isActive && <ActiveLine />}</>
+                    )}
+                  </NavLink>
+                  {/* เพิ่ม Link สำหรับตั้งค่าชำระเงินตรงนี้ */}
+                  <NavLink to="/payment/config" className={navLinkCls}>
+                    {({ isActive }) => (
+                      <>ตั้งค่าชำระเงิน {isActive && <ActiveLine />}</>
+                    )}
+                  </NavLink>
+                </>
               )}
             </div>
           </div>
@@ -123,7 +134,16 @@ export default function Navbar() {
             >
                <NavLink to="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-4 font-black text-[12px] uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all">รายการแข่ง</NavLink>
                <NavLink to="/my-history" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-4 font-black text-[12px] uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all">ประวัติของฉัน</NavLink>
-               {user?.role === 'Admin' && <NavLink to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-2xl bg-indigo-500/10 text-indigo-400 font-black text-[12px] uppercase tracking-widest">จัดการผู้ใช้งาน</NavLink>}
+               
+               {/* ส่วนที่เพิ่ม: Mobile Admin Menu */}
+               {user?.role === 'Admin' && (
+                 <>
+                  <NavLink to="/admin/users" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-2xl bg-indigo-500/10 text-indigo-400 font-black text-[12px] uppercase tracking-widest">จัดการผู้ใช้งาน</NavLink>
+                  {/* เมนูตั้งค่าชำระเงินสำหรับ Mobile */}
+                  <NavLink to="/payment/config" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 p-4 rounded-2xl bg-blue-500/10 text-blue-400 font-black text-[12px] uppercase tracking-widest">ตั้งค่าชำระเงิน</NavLink>
+                 </>
+               )}
+               
                <button onClick={() => { setShowLogoutConfirm(true); setIsMobileMenuOpen(false); }} className="w-full flex items-center gap-3 p-4 text-red-400 font-black text-[12px] uppercase tracking-widest border-t border-white/5 mt-4">ออกจากระบบ</button>
             </motion.div>
           )}
@@ -144,7 +164,7 @@ export default function Navbar() {
               </div>
               <h3 className="text-2xl font-[900] text-white mb-3 italic uppercase tracking-tighter">Exit Arena?</h3>
               <p className="text-slate-400 text-sm mb-10 leading-relaxed font-medium">
-                คุณกำลังจะออกจากพื้นที่การแข่งขัน  ยืนยันการออกจากระบบ?
+                คุณกำลังจะออกระบบบ  ยืนยันการออกจากระบบ?
               </p>
 
               <div className="grid grid-cols-2 gap-4">
