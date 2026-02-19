@@ -1,0 +1,92 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { MessageSquare, Facebook, Mail, Send } from "lucide-react"; 
+
+export default function Contact() {
+  const [formData, setFormData] = useState({ name: "", email: "", subject: "", message: "" });
+  const [sent, setSent] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setSent(true);
+    setTimeout(() => setSent(false), 3000);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] py-16 px-4 text-left">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-16">
+          <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-blue-600 font-black uppercase tracking-[0.3em] text-xs">Get In Touch</motion.span>
+          <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-5xl md:text-7xl font-black text-slate-900 mt-4 tracking-tight">ติดต่อสอบถาม <span className="text-blue-600"></span></motion.h1>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          {/* ข้อมูลการติดต่อ */}
+          <div className="lg:col-span-5 space-y-6">
+            <ContactCard 
+              icon={<MessageSquare size={28} />} 
+              title="Discord" 
+              value="Join Our Community" 
+              color="bg-[#5865F2]" 
+              link="https://discord.gg/C62zqq8A9v"
+            />
+            <ContactCard 
+              icon={<Facebook size={28} />} 
+              title="Facebook" 
+              value="Official Arena Page" 
+              color="bg-[#1877F2]" 
+              link="https://facebook.com/yourpage"
+            />
+            <ContactCard 
+              icon={<Mail size={28} />} 
+              title="Email" 
+              value="support@arena.com" 
+              color="bg-slate-800" 
+              link="mailto:support@arena.com"
+            />
+          </div>
+
+          {/* ฟอร์มส่งข้อความ */}
+          <div className="lg:col-span-7">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="bg-white p-10 rounded-[3rem] shadow-xl border border-slate-50">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">ชื่อของคุณ</label>
+                    <input required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-500 p-4 rounded-2xl outline-none transition-all font-bold" placeholder="Username" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">อีเมล</label>
+                    <input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full bg-slate-50 border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-500 p-4 rounded-2xl outline-none transition-all font-bold" placeholder="email@example.com" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">ข้อความ</label>
+                  <textarea rows="5" value={formData.message} onChange={(e) => setFormData({...formData, message: e.target.value})} className="w-full bg-slate-50 border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-blue-500 p-4 rounded-2xl outline-none transition-all font-bold" placeholder="พิมพ์ข้อความของคุณ..."></textarea>
+                </div>
+                <button type="submit" disabled={sent} className={`w-full py-5 rounded-2xl font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 ${sent ? "bg-green-500 text-white" : "bg-slate-900 text-white hover:bg-blue-600 shadow-lg shadow-blue-100"}`}>
+                  {sent ? "SENT SUCCESSFULLY" : <><Send size={18} /> SEND MESSAGE</>}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// แก้ไข Component Card ให้รับ Icon แบบ Object
+function ContactCard({ icon, title, value, color, link }) {
+  return (
+    <motion.a href={link} target="_blank" rel="noreferrer" whileHover={{ x: 10 }} className="flex items-center gap-6 p-6 bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
+      <div className={`h-16 w-16 ${color} rounded-2xl flex items-center justify-center text-white shadow-lg`}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
+        <p className="text-xl font-black text-slate-800 group-hover:text-blue-600 transition-colors">{value}</p>
+      </div>
+    </motion.a>
+  );
+}
