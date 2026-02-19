@@ -73,41 +73,40 @@ export default function Profile() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formData.name.trim()) return showToast("กรุณากรอกชื่อของคุณ", "error");
-    
-    setLoading(true);
-    try {
-      // 🚩 ใช้ FormData เพื่อส่งไฟล์รูปภาพ
-      const data = new FormData();
-      data.append("name", formData.name);
-      data.append("phone", formData.phone);
-      data.append("bio", formData.bio);
-      data.append("location", formData.location);
-      data.append("socialLink", formData.socialLink);
-      if (formData.password) data.append("password", formData.password);
-      
-      // ถ้ามีการเลือกไฟล์ใหม่ ให้แนบไฟล์ไปในชื่อ "image" ตามที่ Multer ใน Backend รอรับ
-      if (selectedFile) {
-        data.append("image", selectedFile);
-      }
+  e.preventDefault();
+  if (!formData.name.trim()) return showToast("กรุณากรอกชื่อของคุณ", "error");
+  
+  setLoading(true);
+  try {
+    const data = new FormData();
+    data.append("name", formData.name);
+    data.append("phone", formData.phone);
+    data.append("bio", formData.bio);
+    data.append("location", formData.location);
+    data.append("socialLink", formData.socialLink);
+    if (formData.password) data.append("password", formData.password);
 
-      const res = await api.put(`/users/profile`, data, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-
-      if (res.data.status === 'success') {
-        showToast("อัปเดตเรียบร้อย!", "success");
-        if (typeof setUser === 'function') setUser(res.data.data);
-        setFormData(prev => ({ ...prev, password: "" }));
-        setSelectedFile(null);
-      }
-    } catch (err) {
-      showToast(err.response?.data?.message || "บันทึกไม่สำเร็จ", "error");
-    } finally {
-      setLoading(false);
+    if (selectedFile) {
+      data.append("image", selectedFile);
     }
-  };
+
+    // 🔥 แก้ตรงนี้
+    const res = await api.put(`/profile`, data, {
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+
+    if (res.data.status === 'success') {
+      showToast("อัปเดตเรียบร้อย!", "success");
+      if (typeof setUser === 'function') setUser(res.data.data);
+      setFormData(prev => ({ ...prev, password: "" }));
+      setSelectedFile(null);
+    }
+  } catch (err) {
+    showToast(err.response?.data?.message || "บันทึกไม่สำเร็จ", "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (!user) return <div className="h-screen flex items-center justify-center bg-[#FBFBFC]"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
 

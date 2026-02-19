@@ -55,8 +55,8 @@ export default function AdminApproval() {
             {payments.map((pay) => (
               <motion.div layout key={pay.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm flex flex-col md:flex-row items-center gap-6 border border-white">
                 <div className="w-24 h-24 bg-slate-100 rounded-3xl overflow-hidden cursor-zoom-in group relative"
-                  onClick={() => setSelectedImage(`http://localhost:4000/uploads/slips/${pay.slipImage}`)}>
-                  <img src={`http://localhost:4000/uploads/slips/${pay.slipImage}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                  onClick={() => setSelectedImage(`${import.meta.env.VITE_API_URL}/uploads/slips/${pay.slipImage}`)}>
+                  <img src={`${import.meta.env.VITE_API_URL}/uploads/slips/${pay.slipImage}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
                   <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity">
                     <Eye size={20} />
                   </div>
