@@ -73,46 +73,47 @@ export default function Profile() {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!formData.name.trim()) return showToast("กรุณากรอกชื่อของคุณ", "error");
-  
-  setLoading(true);
-  try {
-    const data = new FormData();
-    data.append("name", formData.name);
-    data.append("phone", formData.phone);
-    data.append("bio", formData.bio);
-    data.append("location", formData.location);
-    data.append("socialLink", formData.socialLink);
-    if (formData.password) data.append("password", formData.password);
+    e.preventDefault();
+    if (!formData.name.trim()) return showToast("กรุณากรอกชื่อของคุณ", "error");
 
-    if (selectedFile) {
-      data.append("image", selectedFile);
+    setLoading(true);
+    try {
+      const data = new FormData();
+      data.append("name", formData.name);
+      data.append("phone", formData.phone);
+      data.append("bio", formData.bio);
+      data.append("location", formData.location);
+      data.append("socialLink", formData.socialLink);
+      if (formData.password) data.append("password", formData.password);
+
+      if (selectedFile) {
+        data.append("image", selectedFile);
+      }
+
+      const res = await api.put("/users/profile", data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (res.data.status === 'success') {
+        showToast("อัปเดตเรียบร้อย!", "success");
+        if (typeof setUser === 'function') setUser(res.data.data);
+        setFormData(prev => ({ ...prev, password: "" }));
+        setSelectedFile(null);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || "บันทึกไม่สำเร็จ", "error");
+    } finally {
+      setLoading(false);
     }
-
-    // 🔥 แก้ตรงนี้
-    const res = await api.put(`/profile`, data, {
-      headers: { "Content-Type": "multipart/form-data" }
-    });
-
-    if (res.data.status === 'success') {
-      showToast("อัปเดตเรียบร้อย!", "success");
-      if (typeof setUser === 'function') setUser(res.data.data);
-      setFormData(prev => ({ ...prev, password: "" }));
-      setSelectedFile(null);
-    }
-  } catch (err) {
-    showToast(err.response?.data?.message || "บันทึกไม่สำเร็จ", "error");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   if (!user) return <div className="h-screen flex items-center justify-center bg-[#FBFBFC]"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
 
   return (
     <div className="h-screen bg-[#FBFBFC] font-['Prompt'] text-slate-900 overflow-hidden flex flex-col">
-      
+
       <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[40%] bg-blue-100/30 rounded-full blur-[100px] -z-10" />
       <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-emerald-100/20 rounded-full blur-[100px] -z-10" />
 
@@ -128,7 +129,7 @@ export default function Profile() {
       </AnimatePresence>
 
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex-1 max-w-7xl mx-auto w-full flex flex-col p-6 lg:p-10 overflow-hidden">
-        
+
         <motion.div variants={itemVariants} className="flex items-center justify-between mb-8 flex-shrink-0">
           <button onClick={() => navigate(-1)} className="group flex items-center gap-2 text-slate-400 hover:text-blue-600 font-bold text-sm uppercase tracking-widest transition-all">
             <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> Back
@@ -140,24 +141,24 @@ export default function Profile() {
         </motion.div>
 
         <div className="flex flex-col lg:flex-row gap-8 items-stretch flex-1 overflow-hidden">
-          
+
           <motion.div variants={itemVariants} className="w-full lg:w-[350px] flex flex-col flex-shrink-0">
             <div className="bg-white rounded-[2.5rem] p-8 shadow-2xl shadow-slate-200/50 border border-white flex flex-col items-center text-center h-full">
               <div className="relative mb-6">
                 <div className="w-28 h-28 rounded-[2.2rem] overflow-hidden border-4 border-slate-50 shadow-xl bg-slate-100">
-                  <img src={imagePreview || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" alt="Avatar" 
-                    onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}` }} 
+                  <img src={imagePreview || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" alt="Avatar"
+                    onError={(e) => { e.target.src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}` }}
                   />
                 </div>
                 <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-6 h-6 rounded-full border-[4px] border-white"></div>
               </div>
               <h2 className="text-2xl font-[900] tracking-tighter mb-2">{formData.name || "Unnamed"}</h2>
               <p className="text-blue-600 text-[10px] font-black uppercase tracking-[0.2em] bg-blue-50 px-5 py-2 rounded-full mb-8 inline-block">@{user.username}</p>
-              
+
               <div className="w-full space-y-4 py-6 border-y border-slate-50 text-left">
-                <div className="flex items-center gap-4 font-bold text-slate-600 text-sm"><Phone size={18} className="text-slate-300"/> {formData.phone || "---"}</div>
-                <div className="flex items-center gap-4 font-bold text-slate-600 text-sm"><Globe size={18} className="text-slate-300"/> {formData.location || "---"}</div>
-                <div className="flex items-center gap-4 font-bold text-slate-600 text-sm truncate"><Mail size={18} className="text-slate-300"/> {formData.socialLink || "---"}</div>
+                <div className="flex items-center gap-4 font-bold text-slate-600 text-sm"><Phone size={18} className="text-slate-300" /> {formData.phone || "---"}</div>
+                <div className="flex items-center gap-4 font-bold text-slate-600 text-sm"><Globe size={18} className="text-slate-300" /> {formData.location || "---"}</div>
+                <div className="flex items-center gap-4 font-bold text-slate-600 text-sm truncate"><Mail size={18} className="text-slate-300" /> {formData.socialLink || "---"}</div>
               </div>
 
               <div className="w-full mt-6 p-5 bg-slate-50/50 rounded-3xl text-left border border-slate-100 flex-1 overflow-hidden">
@@ -179,10 +180,10 @@ export default function Profile() {
 
               <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                  
+
                   {/* แก้ไขส่วนอัปโหลดรูปภาพ */}
                   <div className="md:col-span-2 space-y-2">
-                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2"><ImageIcon size={14}/> Profile Picture</label>
+                    <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2"><ImageIcon size={14} /> Profile Picture</label>
                     <div className="relative">
                       <label className="flex items-center gap-3 w-full pl-5 pr-6 py-4 bg-[#FBFBFC] border-2 border-dashed border-slate-100 rounded-2xl text-sm font-bold cursor-pointer hover:bg-slate-50 hover:border-blue-200 transition-all text-slate-500">
                         <Upload size={18} className="text-blue-600" />
