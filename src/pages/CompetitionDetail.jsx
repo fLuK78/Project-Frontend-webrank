@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import { useAuth } from "../contexts/AuthContext";
@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy, ArrowLeft, Loader2, Edit3, Check, X,
   Calendar, ShieldCheck, MapPin, Save, Users, AlertTriangle, Trash2, 
-  CheckCircle2, Verified, Link as LinkIcon
+  CheckCircle2, Verified, Link as LinkIcon, CreditCard
 } from "lucide-react";
 
 export default function CompetitionDetail() {
@@ -30,20 +30,28 @@ export default function CompetitionDetail() {
     name: "", description: "", rules: "", prize: "", date: "", location: "", maxPlayer: 0, image: ""
   });
 
+  // --- Logic Helpers ---
   const currentUserRegistration = useMemo(() => {
     if (!user || !players.length) return null;
     return players.find(p => p.userId === user.id && p.status !== 'cancelled');
   }, [players, user]);
 
   const hasJoined = !!currentUserRegistration;
-  const isApproved = currentUserRegistration?.status === 'approved';
+  const registrationStatus = currentUserRegistration?.status; 
+  const isApproved = registrationStatus === 'approved';
+  
+  const isFull = useMemo(() => {
+    if (!competition) return false;
+    const approvedCount = players.filter(p => p.status === 'approved').length;
+    return competition.maxPlayer > 0 && approvedCount >= competition.maxPlayer;
+  }, [competition, players]);
 
   const showToast = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [compRes, participantsRes] = await Promise.all([
@@ -52,18 +60,19 @@ export default function CompetitionDetail() {
       ]);
 
       const compData = compRes.data.data || compRes.data;
-      setCompetition(compData);
-
-      setEditForm({
-        name: compData?.name || "",
-        description: compData?.description || "",
-        rules: compData?.rules || "",
-        prize: compData?.prize || "",
-        date: compData?.date ? compData.date.split('T')[0] : "",
-        location: compData?.location || "",
-        maxPlayer: compData?.maxPlayer || 0,
-        image: compData?.image || ""
-      });
+      if (compData) {
+        setCompetition(compData);
+        setEditForm({
+          name: compData.name || "",
+          description: compData.description || "",
+          rules: compData.rules || "",
+          prize: compData.prize || "",
+          date: compData.date ? compData.date.split('T')[0] : "",
+          location: compData.location || "",
+          maxPlayer: compData.maxPlayer || 0,
+          image: compData.image || ""
+        });
+      }
 
       const participantsData = participantsRes.data.data || [];
       setPlayers(participantsData);
@@ -77,12 +86,13 @@ export default function CompetitionDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, user]);
 
   useEffect(() => {
     if (id) fetchData();
-  }, [id, user?.id]);
+  }, [fetchData]);
 
+  // --- Actions ---
   const handleUpdate = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -103,23 +113,15 @@ export default function CompetitionDetail() {
       showToast("กรุณาเข้าสู่ระบบก่อน", "error");
       return setTimeout(() => navigate("/login"), 1500);
     }
+    if (hasJoined || isFull || submitting) return;
     
-    if (hasJoined || submitting) return;
-
     setSubmitting(true);
     try {
-      const response = await api.post(`/registrations`, { userId: user.id, competitionId: id });
-      const newReg = response.data.data || response.data;
-      setRegistrationId(newReg.id);
-      showToast("สมัครสำเร็จ!", "success");
-      fetchData();
+      await api.post(`/registrations`, { userId: user.id, competitionId: id });
+      showToast("สมัครสำเร็จ! กรุณาชำระเงิน", "success");
+      fetchData(); 
     } catch (err) {
-      if (err.response?.status === 409) {
-        showToast("คุณได้สมัครรายการนี้ไปแล้ว", "error");
-        fetchData();
-      } else {
-        showToast(err.response?.data?.message || "สมัครไม่สำเร็จ", "error");
-      }
+      showToast(err.response?.data?.message || "สมัครไม่สำเร็จ", "error");
     } finally {
       setSubmitting(false);
     }
@@ -128,28 +130,24 @@ export default function CompetitionDetail() {
   const handleCancelJoin = async () => {
     const targetId = registrationId || currentUserRegistration?.id;
     if (!targetId) return showToast("ไม่พบข้อมูลการสมัคร", "error");
-
+    
     setSubmitting(true);
     try {
       await api.delete(`/registrations/${targetId}`);
+      setRegistrationId(null);
+      setPlayers(prev => prev.filter(p => p.id !== targetId)); 
       showToast("ยกเลิกการสมัครแล้ว", "success");
       setShowCancelModal(false);
-      setRegistrationId(null);
-      fetchData();
+      fetchData(); 
     } catch (err) {
-      if (err.response?.status === 404) {
-        showToast("ไม่พบข้อมูลในระบบ", "error");
-        fetchData();
-      } else {
-        showToast("ไม่สามารถยกเลิกการสมัครได้", "error");
-      }
+      showToast(err.response?.data?.message || "ไม่สามารถยกเลิกได้", "error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleStatusUpdate = async (regId, newStatus) => {
-    if (newStatus === 'rejected') {
+  const handleStatusUpdate = async (regId, status) => {
+    if (status === 'rejected') {
       setSelectedRegId(regId);
       setShowAdminRejectModal(true);
       return;
@@ -157,11 +155,11 @@ export default function CompetitionDetail() {
 
     setSubmitting(true);
     try {
-      await api.put(`/registrations/${regId}/status`, { status: newStatus });
-      showToast(`ดำเนินการเรียบร้อยแล้ว`, "success");
+      await api.put(`/registrations/${regId}/status`, { status });
+      showToast(`อัปเดตสถานะเป็น ${status} สำเร็จ`, "success");
       fetchData();
     } catch (err) {
-      showToast("ไม่สามารถเปลี่ยนสถานะได้", "error");
+      showToast("ไม่สามารถอัปเดตสถานะได้", "error");
     } finally {
       setSubmitting(false);
     }
@@ -171,13 +169,12 @@ export default function CompetitionDetail() {
     if (!selectedRegId) return;
     setSubmitting(true);
     try {
-      await api.delete(`/registrations/${selectedRegId}`);
-      showToast("ลบรายชื่อผู้สมัครเรียบร้อย", "success");
+      await api.put(`/registrations/${selectedRegId}/status`, { status: 'rejected' });
+      showToast("ปฏิเสธการสมัครเรียบร้อยแล้ว", "success");
       setShowAdminRejectModal(false);
-      setPlayers(prev => prev.filter(p => p.id !== selectedRegId));
-    } catch (err) {
-      showToast("ไม่สามารถลบข้อมูลได้", "error");
       fetchData();
+    } catch (err) {
+      showToast("ไม่สามารถดำเนินการได้", "error");
     } finally {
       setSubmitting(false);
       setSelectedRegId(null);
@@ -204,6 +201,7 @@ export default function CompetitionDetail() {
         )}
       </AnimatePresence>
 
+      {/* Cancel Modal (User) */}
       <AnimatePresence>
         {showCancelModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -223,17 +221,18 @@ export default function CompetitionDetail() {
         )}
       </AnimatePresence>
 
+      {/* Admin Reject Modal */}
       <AnimatePresence>
         {showAdminRejectModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !submitting && setShowAdminRejectModal(false)} className="absolute inset-0 bg-slate-900/80 backdrop-blur-md" />
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-white w-full max-w-md p-10 rounded-[3rem] shadow-2xl text-center border border-slate-100">
-              <div className="w-24 h-24 bg-rose-100 text-rose-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner"><Trash2 size={48} /></div>
-              <h3 className="text-3xl font-black text-slate-800 uppercase italic mb-3">Reject Player?</h3>
-              <p className="text-slate-500 font-medium mb-10 leading-relaxed">คุณต้องการลบรายชื่อผู้สมัครนี้หรือไม่? ข้อมูลจะถูกลบออกจากฐานข้อมูลทันที</p>
+              <div className="w-24 h-24 bg-rose-100 text-rose-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner"><X size={48} /></div>
+              <h3 className="text-3xl font-black text-slate-800 uppercase italic mb-3">Reject Entry?</h3>
+              <p className="text-slate-500 font-medium mb-10 leading-relaxed">คุณต้องการปฏิเสธการยืนยันผู้สมัครรายนี้หรือไม่?</p>
               <div className="flex flex-col gap-3">
                 <button onClick={confirmAdminReject} disabled={submitting} className="w-full py-5 bg-rose-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-xs shadow-xl shadow-rose-200 hover:bg-rose-700 transition-all flex items-center justify-center gap-2">
-                  {submitting ? <Loader2 className="animate-spin" size={18} /> : "Confirm Reject & Delete"}
+                  {submitting ? <Loader2 className="animate-spin" size={18} /> : "Confirm Reject"}
                 </button>
                 <button onClick={() => setShowAdminRejectModal(false)} className="w-full py-4 text-slate-400 font-black uppercase tracking-widest text-[10px] hover:text-slate-600 transition-all">Cancel</button>
               </div>
@@ -242,6 +241,7 @@ export default function CompetitionDetail() {
         )}
       </AnimatePresence>
 
+      {/* Edit Modal (Admin) */}
       <AnimatePresence>
         {isEditing && (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
@@ -297,6 +297,7 @@ export default function CompetitionDetail() {
         )}
       </AnimatePresence>
 
+      {/* Header Navigation */}
       <div className="max-w-7xl mx-auto px-6 py-8 flex justify-between items-center">
         <button onClick={() => navigate(-1)} className="group flex items-center gap-2 text-slate-400 hover:text-blue-600 font-black uppercase text-[10px] tracking-widest transition-all">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" /> Back to Arena
@@ -309,6 +310,7 @@ export default function CompetitionDetail() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {/* Main Content (Left) */}
         <div className="lg:col-span-8 space-y-8">
           <div className="relative h-[450px] rounded-[3.5rem] overflow-hidden shadow-2xl border-4 border-white">
             <img src={competition?.image || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070"} className="absolute inset-0 w-full h-full object-cover" alt="banner" />
@@ -370,8 +372,13 @@ export default function CompetitionDetail() {
                               </div>
                               <div>
                                 <p className="font-black text-slate-800 text-sm">{p.user?.name || "Player"}</p>
-                                <span className={`text-[9px] uppercase font-black px-2 py-0.5 rounded-full ${p.status === 'approved' ? 'bg-emerald-100 text-emerald-600' : p.status === 'rejected' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
-                                  {p.status}
+                                <span className={`text-[9px] uppercase font-black px-2 py-0.5 rounded-full ${
+                                  p.status === 'approved' ? 'bg-emerald-100 text-emerald-600' : 
+                                  p.status === 'waiting' ? 'bg-blue-100 text-blue-600' :
+                                  p.status === 'rejected' ? 'bg-rose-100 text-rose-600' :
+                                  'bg-amber-100 text-amber-600'
+                                }`}>
+                                  {p.status === 'waiting' ? 'Checking Slip' : p.status}
                                 </span>
                               </div>
                             </div>
@@ -397,11 +404,13 @@ export default function CompetitionDetail() {
           </div>
         </div>
 
+        {/* Sidebar (Right) */}
         <div className="lg:col-span-4">
           <div className="bg-white rounded-[3.5rem] p-10 border border-slate-100 shadow-2xl sticky top-10 space-y-10">
             <div className="text-center pb-6 border-b border-slate-50">
               <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Logistics & Rewards</p>
             </div>
+            
             <div className="space-y-8">
               <div className="flex items-center gap-5">
                 <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-500 shadow-sm"><Trophy size={24} /></div>
@@ -413,30 +422,76 @@ export default function CompetitionDetail() {
               </div>
               <div className="flex items-center gap-5">
                 <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600 shadow-sm"><Users size={24} /></div>
-                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Players Booked</p><p className="font-black text-xl text-slate-800">{players.length} / {competition?.maxPlayer || "∞"}</p></div>
+                <div><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Players Booked</p><p className="font-black text-xl text-slate-800">{players.filter(p => p.status === 'approved').length} / {competition?.maxPlayer || "∞"}</p></div>
               </div>
             </div>
 
             <div className="pt-6 space-y-4">
               <AnimatePresence>
+                {/* Approved Status */}
                 {isApproved && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-3">
-                    <Verified size={20} className="text-emerald-500" />
-                    <p className="text-emerald-700 font-black text-[10px] uppercase">Official Entry Confirmed</p>
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 bg-emerald-50 rounded-[2rem] border border-emerald-100 flex items-center gap-4 shadow-sm shadow-emerald-50">
+                    <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-emerald-200">
+                      <Verified size={20} />
+                    </div>
+                    <div>
+                      <p className="text-emerald-700 font-black text-[11px] uppercase tracking-tighter">Confirmed Entry</p>
+                      <p className="text-emerald-600/70 text-[9px] font-medium leading-none mt-1">คุณมีสิทธิ์เข้าแข่งขันเรียบร้อยแล้ว</p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Waiting Status */}
+                {registrationStatus === 'waiting' && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 bg-blue-50 rounded-[2rem] border border-blue-100 flex items-center gap-4 shadow-sm">
+                    <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center animate-pulse">
+                      <Loader2 size={20} className="animate-spin" />
+                    </div>
+                    <div>
+                      <p className="text-blue-700 font-black text-[11px] uppercase tracking-tighter">Verification Pending</p>
+                      <p className="text-blue-600/70 text-[9px] font-medium leading-none mt-1">ได้รับสลิปแล้ว รอแอดมินยืนยันครู่เดียว</p>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Rejected Status */}
+                {registrationStatus === 'rejected' && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 bg-rose-50 rounded-[2rem] border border-rose-100 flex items-center gap-4 shadow-sm">
+                    <div className="w-10 h-10 bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg shadow-rose-200">
+                      <X size={20} />
+                    </div>
+                    <div>
+                      <p className="text-rose-700 font-black text-[11px] uppercase tracking-tighter">Rejected</p>
+                      <p className="text-rose-600/70 text-[9px] font-medium leading-none mt-1">คุณไม่ได้รับการยืนยันจากแอดมิน กรุณาติดต่อสอบถาม</p>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               <button
                 onClick={handleJoin}
-                disabled={hasJoined || submitting || (competition?.maxPlayer > 0 && players.length >= competition?.maxPlayer)}
+                disabled={hasJoined || submitting || isFull}
                 className={`w-full py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 shadow-xl
-                  ${hasJoined ? 'bg-emerald-50 text-emerald-600 cursor-not-allowed border border-emerald-100 shadow-none' : (competition?.maxPlayer > 0 && players.length >= competition?.maxPlayer) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-slate-900 active:scale-95 shadow-blue-200'}`}
+                  ${hasJoined ? (registrationStatus === 'rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100 cursor-not-allowed shadow-none' : 'bg-emerald-50 text-emerald-600 cursor-not-allowed border border-emerald-100 shadow-none') : isFull ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-slate-900 active:scale-95 shadow-blue-200'}`}
               >
-                {submitting && !showCancelModal && !showAdminRejectModal ? <Loader2 className="animate-spin" /> : hasJoined ? <><ShieldCheck size={18} /> Registered</> : "Join the Arena"}
+                {submitting && !showCancelModal ? <Loader2 className="animate-spin" /> : 
+                 registrationStatus === 'rejected' ? <><X size={18} /> Rejected</> :
+                 hasJoined ? <><ShieldCheck size={18} /> Registered</> : 
+                 isFull ? "Arena is Full" : "Join the Arena"}
               </button>
 
-              {hasJoined && !isApproved && (
+              {/* Payment Button (Only if pending) */}
+              {hasJoined && !isApproved && registrationStatus === 'pending' && (
+                <button
+                  onClick={() => navigate(`/payment/${registrationId}`)}
+                  className="w-full py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-3 hover:bg-blue-600 transition-all"
+                >
+                  <CreditCard size={18} /> จ่ายเงิน / ส่งสลิป
+                </button>
+              )}
+
+              {/* Cancel Button (Only if joined but not approved) */}
+              {hasJoined && !isApproved && registrationStatus !== 'rejected' && (
                 <button
                   onClick={() => setShowCancelModal(true)}
                   disabled={submitting}
@@ -445,6 +500,7 @@ export default function CompetitionDetail() {
                   <Trash2 size={14} /> Cancel Registration
                 </button>
               )}
+
               {!user && <p className="text-center text-[9px] font-black text-slate-400 uppercase tracking-widest mt-4">Login to Join Tournament</p>}
             </div>
           </div>
